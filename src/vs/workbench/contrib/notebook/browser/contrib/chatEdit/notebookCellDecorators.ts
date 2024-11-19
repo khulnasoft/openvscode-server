@@ -11,7 +11,6 @@ import { NotebookTextModel } from '../../../common/model/notebookTextModel.js';
 import { INotebookEditor } from '../../notebookBrowser.js';
 import { ThrottledDelayer } from '../../../../../../base/common/async.js';
 import { CellDiffInfo } from '../../diff/notebookDiffViewModel.js';
-import { CellKind } from '../../../common/notebookCommon.js';
 import { ICodeEditor, IViewZone } from '../../../../../../editor/browser/editorBrowser.js';
 import { IEditorWorkerService } from '../../../../../../editor/common/services/editorWorker.js';
 import { ILanguageService } from '../../../../../../editor/common/languages/language.js';

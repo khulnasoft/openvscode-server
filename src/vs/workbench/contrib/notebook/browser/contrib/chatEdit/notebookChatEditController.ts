@@ -4,13 +4,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { isEqual } from '../../../../../../base/common/resources.js';
-import { Disposable, dispose, IDisposable, IReference, toDisposable } from '../../../../../../base/common/lifecycle.js';
+import { Disposable, dispose, IReference, toDisposable } from '../../../../../../base/common/lifecycle.js';
 import { autorun, derived, derivedWithStore, observableFromEvent, observableValue } from '../../../../../../base/common/observable.js';
 import { IChatEditingService, WorkingSetEntryState } from '../../../../chat/common/chatEditingService.js';
 import { NotebookTextModel } from '../../../common/model/notebookTextModel.js';
 import { INotebookEditor, INotebookEditorContribution } from '../../notebookBrowser.js';
 import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
-import { ICodeEditor } from '../../../../../../editor/browser/editorBrowser.js';
 import { NotebookCellTextModel } from '../../../common/model/notebookCellTextModel.js';
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
 import { NotebookDeletedCellDecorator, NotebookInsertedCellDecorator, NotebookCellDiffDecorator } from './notebookCellDecorators.js';
