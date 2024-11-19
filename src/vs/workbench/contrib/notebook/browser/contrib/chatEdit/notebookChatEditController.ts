@@ -65,9 +65,7 @@ class NotebookChatEditorController extends Disposable {
 		const originalModel = observableValue<NotebookTextModel | undefined>('originalModel', undefined);
 		const viewModelAttached = observableFromEvent(this.notebookEditor.onDidAttachViewModel, () => !!this.notebookEditor.getViewModel());
 		const onDidChangeVisibleRanges = debouncedObservable2(observableFromEvent(this.notebookEditor.onDidChangeVisibleRanges, () => this.notebookEditor.visibleRanges), 100);
-		const decorators = new Map<NotebookCellTextModel, {
-			editor: ICodeEditor; modifiedCell: NotebookCellTextModel; originalCell: NotebookCellTextModel;
-		} & IDisposable>();
+		const decorators = new Map<NotebookCellTextModel, NotebookCellDiffDecorator>();
 
 		let updatedCellDecoratorsOnceBefore = false;
 		let updatedDeletedInsertedDecoratorsOnceBefore = false;
@@ -177,6 +175,14 @@ class NotebookChatEditorController extends Disposable {
 							}
 						}));
 					}
+				}
+			});
+
+			const visibleEditors = new Set(this.notebookEditor.codeEditors.map(e => e[1]));
+			decorators.forEach((v, cell) => {
+				if (!visibleEditors.has(v.editor)) {
+					v.dispose();
+					decorators.delete(cell);
 				}
 			});
 		}));
