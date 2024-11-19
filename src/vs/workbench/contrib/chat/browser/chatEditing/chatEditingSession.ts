@@ -30,11 +30,11 @@ import { IEditorService } from '../../../../services/editor/common/editorService
 import { MultiDiffEditor } from '../../../multiDiffEditor/browser/multiDiffEditor.js';
 import { MultiDiffEditorInput } from '../../../multiDiffEditor/browser/multiDiffEditorInput.js';
 import { ChatAgentLocation, IChatAgentService } from '../../common/chatAgents.js';
-import { ChatEditingSessionChangeType, ChatEditingSessionState, ChatEditKind, IChatEditingSession, WorkingSetDisplayMetadata, WorkingSetEntryState } from '../../common/chatEditingService.js';
+import { ChatEditingSessionChangeType, ChatEditingSessionState, ChatEditKind, IChatEditingSession, IModifiedEntryTelemetryInfo, IModifiedFileEntry, ISnapshotEntry, WorkingSetDisplayMetadata, WorkingSetEntryState } from '../../common/chatEditingService.js';
 import { IChatResponseModel } from '../../common/chatModel.js';
 import { IChatWidgetService } from '../chat.js';
 import { ChatEditingMultiDiffSourceResolver } from './chatEditingService.js';
-import { ChatEditingModifiedFileEntry, IModifiedEntryTelemetryInfo, ISnapshotEntry } from './chatEditingModifiedFileEntry.js';
+import { ChatEditingModifiedFileEntry } from './chatEditingModifiedFileEntry.js';
 import { ChatEditingTextModelContentProvider } from './chatEditingTextModelContentProviders.js';
 import { Schemas } from '../../../../../base/common/network.js';
 import { isEqual } from '../../../../../base/common/resources.js';
@@ -52,8 +52,8 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 
 	private readonly _filesToSkipCreating = new ResourceSet();
 
-	private readonly _entriesObs = observableValue<readonly ChatEditingModifiedFileEntry[]>(this, []);
-	public get entries(): IObservable<readonly ChatEditingModifiedFileEntry[]> {
+	private readonly _entriesObs = observableValue<readonly IModifiedFileEntry[]>(this, []);
+	public get entries(): IObservable<readonly IModifiedFileEntry[]> {
 		this._assertNotDisposed();
 		return this._entriesObs;
 	}
@@ -251,7 +251,7 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 		}
 
 		const snapshotEntry = [...entries.values()].find((e) => isEqual(e.snapshotUri, snapshotUri));
-		if (!snapshotEntry) {
+		if (!snapshotEntry || snapshotEntry.kind !== 'text') {
 			return null;
 		}
 
@@ -298,8 +298,7 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 		// Reset all the files which are modified in this session state
 		// but which are not found in the snapshot
 		for (const entry of this._entriesObs.get()) {
-			const snapshotEntry = snapshot.entries.get(entry.modifiedURI);
-			if (!snapshotEntry) {
+			if (entry.kind === 'text' && !snapshot.entries.get(entry.modifiedURI)) {
 				const initialContents = this._initialFileContents.get(entry.modifiedURI);
 				if (typeof initialContents === 'string') {
 					entry.resetToInitialValue(initialContents);
@@ -308,11 +307,17 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 			}
 		}
 
-		const entriesArr: ChatEditingModifiedFileEntry[] = [];
+		const entriesArr: IModifiedFileEntry[] = [];
 		// Restore all entries from the snapshot
 		for (const snapshotEntry of snapshot.entries.values()) {
 			const entry = await this._getOrCreateModifiedFileEntry(snapshotEntry.resource, snapshotEntry.telemetryInfo);
-			entry.restoreFromSnapshot(snapshotEntry);
+			if (entry.kind === 'text' && snapshotEntry.kind === 'text') {
+				entry.restoreFromSnapshot(snapshotEntry);
+			} else if (entry.kind === 'notebook' && snapshotEntry.kind === 'notebook') {
+				entry.restoreFromSnapshot(snapshotEntry);
+			} else {
+				throw new Error('Unexpected snapshot entry kind');
+			}
 			entriesArr.push(entry);
 		}
 
@@ -435,7 +440,7 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 		this._assertNotDisposed();
 
 		const entry = this._entriesObs.get().find(e => e.entryId === documentId);
-		return entry?.originalModel ?? null;
+		return entry?.kind === 'text' ? entry?.originalModel ?? null : null;
 	}
 
 	acceptStreamingEditsStart(): void {
@@ -560,7 +565,7 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 		this._onDidChange.fire(ChatEditingSessionChangeType.Other);
 	}
 
-	private async _getOrCreateModifiedFileEntry(resource: URI, responseModel: IModifiedEntryTelemetryInfo): Promise<ChatEditingModifiedFileEntry> {
+	private async _getOrCreateModifiedFileEntry(resource: URI, responseModel: IModifiedEntryTelemetryInfo): Promise<IModifiedFileEntry> {
 		const existingEntry = this._entriesObs.get().find(e => isEqual(e.modifiedURI, resource));
 		if (existingEntry) {
 			if (responseModel.requestId !== existingEntry.telemetryInfo.requestId) {
@@ -571,7 +576,7 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 
 		// This gets manually disposed in .dispose() or in .restoreSnapshot()
 		const entry = await this._createModifiedFileEntry(resource, responseModel);
-		if (!this._initialFileContents.has(resource)) {
+		if (!this._initialFileContents.has(resource) && entry.kind === 'text') {
 			this._initialFileContents.set(resource, entry.modifiedModel.getValue());
 		}
 		// If an entry is deleted e.g. reverting a created file,
@@ -591,7 +596,7 @@ export class ChatEditingSession extends Disposable implements IChatEditingSessio
 		return entry;
 	}
 
-	private async _createModifiedFileEntry(resource: URI, responseModel: IModifiedEntryTelemetryInfo, mustExist = false): Promise<ChatEditingModifiedFileEntry> {
+	private async _createModifiedFileEntry(resource: URI, responseModel: IModifiedEntryTelemetryInfo, mustExist = false): Promise<IModifiedFileEntry> {
 		try {
 			const ref = await this._textModelService.createModelReference(resource);
 

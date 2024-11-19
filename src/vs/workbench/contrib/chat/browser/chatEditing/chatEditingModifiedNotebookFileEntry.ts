@@ -28,15 +28,15 @@ import { editorSelectionBackground } from '../../../../../platform/theme/common/
 import { IUndoRedoService } from '../../../../../platform/undoRedo/common/undoRedo.js';
 import { SaveReason } from '../../../../common/editor.js';
 import { IResolvedTextFileEditorModel } from '../../../../services/textfile/common/textfiles.js';
-import { ChatEditKind, IModifiedEntryTelemetryInfo, IModifiedTextFileEntry, ITextSnapshotEntry, WorkingSetEntryState } from '../../common/chatEditingService.js';
+import { ChatEditKind, IModifiedEntryTelemetryInfo, IModifiedNotebookFileEntry, INotebookSnapshotEntry, WorkingSetEntryState } from '../../common/chatEditingService.js';
 import { IChatService } from '../../common/chatService.js';
 import { ChatEditingSnapshotTextModelContentProvider, ChatEditingTextModelContentProvider } from './chatEditingTextModelContentProviders.js';
 
-export class ChatEditingModifiedFileEntry extends Disposable implements IModifiedTextFileEntry {
-	public readonly kind = 'text';
-	public static readonly scheme = 'modified-file-entry';
+export class ChatEditingModifiedNotebookFileEntry extends Disposable implements IModifiedNotebookFileEntry {
+	public readonly kind = 'notebook';
+	public static readonly scheme = 'modified-notebook-file-entry';
 	private static lastEntryId = 0;
-	public readonly entryId = `${ChatEditingModifiedFileEntry.scheme}::${++ChatEditingModifiedFileEntry.lastEntryId}`;
+	public readonly entryId = `${ChatEditingModifiedNotebookFileEntry.scheme}::${++ChatEditingModifiedNotebookFileEntry.lastEntryId}`;
 
 	private readonly docSnapshot: ITextModel;
 	private readonly originalContent;
@@ -177,26 +177,23 @@ export class ChatEditingModifiedFileEntry extends Disposable implements IModifie
 		this._telemetryInfo = telemetryInfo;
 	}
 
-	createSnapshot(requestId: string | undefined): ITextSnapshotEntry {
+	createSnapshot(requestId: string | undefined): INotebookSnapshotEntry {
 		this._isFirstEditAfterStartOrSnapshot = true;
 		return {
-			kind: 'text',
+			kind: 'notebook',
 			resource: this.modifiedURI,
-			languageId: this.modifiedModel.getLanguageId(),
 			snapshotUri: ChatEditingSnapshotTextModelContentProvider.getSnapshotFileURI(requestId, this.modifiedURI.path),
-			original: this.originalModel.getValue(),
-			current: this.modifiedModel.getValue(),
 			originalToCurrentEdit: this._edit,
 			state: this.state.get(),
 			telemetryInfo: this._telemetryInfo
 		};
 	}
 
-	restoreFromSnapshot(snapshot: ITextSnapshotEntry) {
-		this._stateObs.set(snapshot.state, undefined);
-		this.docSnapshot.setValue(snapshot.original);
-		this._setDocValue(snapshot.current);
-		this._edit = snapshot.originalToCurrentEdit;
+	restoreFromSnapshot(snapshot: INotebookSnapshotEntry) {
+		// this._stateObs.set(snapshot.state, undefined);
+		// this.docSnapshot.setValue(snapshot.original);
+		// this._setDocValue(snapshot.current);
+		// this._edit = snapshot.originalToCurrentEdit;
 	}
 
 	resetToInitialValue(value: string) {
@@ -280,7 +277,7 @@ export class ChatEditingModifiedFileEntry extends Disposable implements IModifie
 		// highlight edits
 		this._editDecorations = this.doc.deltaDecorations(this._editDecorations, textEdits.map(edit => {
 			return {
-				options: ChatEditingModifiedFileEntry._editDecorationOptions,
+				options: ChatEditingModifiedNotebookFileEntry._editDecorationOptions,
 				range: edit.range
 			} satisfies IModelDeltaDecoration;
 		}));
