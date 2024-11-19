@@ -65,7 +65,9 @@ class NotebookChatEditorController extends Disposable {
 		const originalModel = observableValue<NotebookTextModel | undefined>('originalModel', undefined);
 		const viewModelAttached = observableFromEvent(this.notebookEditor.onDidAttachViewModel, () => !!this.notebookEditor.getViewModel());
 		const onDidChangeVisibleRanges = debouncedObservable2(observableFromEvent(this.notebookEditor.onDidChangeVisibleRanges, () => this.notebookEditor.visibleRanges), 100);
-		const decorators = new Map<NotebookCellTextModel, { editor: ICodeEditor } & IDisposable>();
+		const decorators = new Map<NotebookCellTextModel, {
+			editor: ICodeEditor; modifiedCell: NotebookCellTextModel; originalCell: NotebookCellTextModel;
+		} & IDisposable>();
 
 		let updatedCellDecoratorsOnceBefore = false;
 		let updatedDeletedInsertedDecoratorsOnceBefore = false;
@@ -120,7 +122,7 @@ class NotebookChatEditorController extends Disposable {
 		}).recomputeInitiallyAndOnChange(this._store).flatten();
 
 		const notebookCellDiffInfo = notebookDiffInfo.map(d => d?.cellDiff);
-		this._register(instantiationService.createInstance(NotebookChatActionsOverlayController, notebookEditor, notebookCellDiffInfo));
+		this._register(instantiationService.createInstance(NotebookChatActionsOverlayController, notebookEditor, notebookCellDiffInfo, this.deletedCellDecorator));
 
 		this._register(autorun(r => {
 			// If we have a new entry for the file, then clear old decorators.
@@ -158,11 +160,15 @@ class NotebookChatEditorController extends Disposable {
 			diffInfo.cellDiff.forEach((diff) => {
 				if (diff.type === 'modified') {
 					const modifiedCell = modified.cells[diff.modifiedCellIndex];
-					const originalCellValue = original.cells[diff.originalCellIndex].getValue();
+					const originalCell = original.cells[diff.originalCellIndex];
 					const editor = this.notebookEditor.codeEditors.find(([vm,]) => vm.handle === modifiedCell.handle)?.[1];
-					if (editor && decorators.get(modifiedCell)?.editor !== editor) {
+
+					if (editor && (decorators.get(modifiedCell)?.editor !== editor ||
+						decorators.get(modifiedCell)?.modifiedCell !== modifiedCell ||
+						decorators.get(modifiedCell)?.originalCell !== originalCell)) {
+
 						decorators.get(modifiedCell)?.dispose();
-						const decorator = this.instantiationService.createInstance(NotebookCellDiffDecorator, editor, originalCellValue, modifiedCell.cellKind);
+						const decorator = this.instantiationService.createInstance(NotebookCellDiffDecorator, editor, modifiedCell, originalCell);
 						decorators.set(modifiedCell, decorator);
 						this._register(editor.onDidDispose(() => {
 							decorator.dispose();
