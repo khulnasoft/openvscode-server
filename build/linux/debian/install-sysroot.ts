@@ -5,12 +5,12 @@
 
 import { spawnSync, execSync } from 'child_process';
 import { tmpdir } from 'os';
-import fs from 'fs';
-import https from 'https';
-import path from 'path';
+import * as fs from 'fs';
+import * as https from 'https';
+import * as path from 'path';
 import { createHash } from 'crypto';
 import { DebianArchString } from './types';
-import ansiColors from 'ansi-colors';
+import * as ansiColors from 'ansi-colors';
 
 // Based on https://source.chromium.org/chromium/chromium/src/+/main:build/linux/sysroot_scripts/install-sysroot.py.
 const URL_PREFIX = 'https://msftelectronbuild.z5.web.core.windows.net';
@@ -81,7 +81,7 @@ async function fetchUrl(options: IFetchOptions, retries = 10, retryDelay = 1000)
 		const timeout = setTimeout(() => controller.abort(), 30 * 1000);
 		const version = '20240129-253798';
 		try {
-			const response = await fetch(`https://api.github.com/repos/Microsoft/vscode-linux-build-agent/releases/tags/v${version}`, {
+			const response = await fetch(`https://api.github.com/repos/khulnasoft/vscode-linux-build-agent/releases/tags/v${version}`, {
 				headers: ghApiHeaders,
 				signal: controller.signal as any /* Typings issue with lib.dom.d.ts */
 			});
@@ -90,7 +90,7 @@ async function fetchUrl(options: IFetchOptions, retries = 10, retryDelay = 1000)
 				const contents = Buffer.from(await response.arrayBuffer());
 				const asset = JSON.parse(contents.toString()).assets.find((a: { name: string }) => a.name === options.assetName);
 				if (!asset) {
-					throw new Error(`Could not find asset in release of Microsoft/vscode-linux-build-agent @ ${version}`);
+					throw new Error(`Could not find asset in release of khulnasoft/vscode-linux-build-agent @ ${version}`);
 				}
 				console.log(`Found asset ${options.assetName} @ ${asset.url}.`);
 				const assetResponse = await fetch(asset.url, {

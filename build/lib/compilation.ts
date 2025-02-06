@@ -3,24 +3,27 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import es from 'event-stream';
-import fs from 'fs';
-import gulp from 'gulp';
-import path from 'path';
+import * as es from 'event-stream';
+import * as fs from 'fs';
+import * as gulp from 'gulp';
+import * as path from 'path';
 import * as monacodts from './monaco-api';
 import * as nls from './nls';
 import { createReporter } from './reporter';
 import * as util from './util';
-import fancyLog from 'fancy-log';
-import ansiColors from 'ansi-colors';
-import os from 'os';
-import File from 'vinyl';
+import * as fancyLog from 'fancy-log';
+import * as ansiColors from 'ansi-colors';
+import * as os from 'os';
+import * as File from 'vinyl';
 import * as task from './task';
 import { Mangler } from './mangle/index';
 import { RawSourceMap } from 'source-map';
 import { gulpPostcss } from './postcss';
 import ts = require('typescript');
 const watch = require('./watch');
+const packageJson = require('../../package.json');
+const productJson = require('../../product.json');
+const replace = require('gulp-replace');
 
 
 // --- gulp-tsb: compile and transpile --------------------------------
@@ -77,8 +80,20 @@ function createCompile(src: string, { build, emitError, transpileOnly, preserveE
 
 		const postcssNesting = require('postcss-nesting');
 
+		const productJsFilter = util.filter(data => !build && data.path.endsWith('vs/platform/product/common/product.ts'));
+		const productConfiguration = JSON.stringify({
+			...productJson,
+			version: `${packageJson.version}-dev`,
+			nameShort: `${productJson.nameShort} Dev`,
+			nameLong: `${productJson.nameLong} Dev`,
+			dataFolderName: `${productJson.dataFolderName}-dev`
+		});
+
 		const input = es.through();
 		const output = input
+			.pipe(productJsFilter)
+			.pipe(replace(/{\s*\/\*BUILD->INSERT_PRODUCT_CONFIGURATION\*\/\s*}/, productConfiguration, { skipBinary: true }))
+			.pipe(productJsFilter.restore)
 			.pipe(util.$if(isUtf8Test, bom())) // this is required to preserve BOM in test files that loose it otherwise
 			.pipe(util.$if(!build && isRuntimeJs, util.appendOwnPathSourceURL()))
 			.pipe(util.$if(isCSS, gulpPostcss([postcssNesting()], err => reporter(String(err)))))
